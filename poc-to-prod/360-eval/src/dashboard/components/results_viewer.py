@@ -146,15 +146,20 @@ class ResultsViewerComponent:
             )
     
     def _show_report(self, report_path):
-        """Display an HTML report."""
+        """Provide a link to the HTML report."""
         # Check if report exists
         if not os.path.exists(report_path):
             st.error(f"Report file not found: {report_path}")
             return
         
-        # Read HTML content
-        with open(report_path, 'r', encoding='utf-8') as f:
-            html_content = f.read()
+        # Create a file URL for the report
+        report_filename = os.path.basename(report_path)
+        file_url = f"file://{os.path.abspath(report_path)}"
         
-        # Display HTML
-        st.components.v1.html(html_content, height=600, scrolling=True)
+        # Display link to open the report in browser
+        st.markdown(f"### Report: {report_filename}")
+        st.markdown(f"Click below to open the report in your browser:")
+        st.markdown(f"[📊 Open Full Report in Browser]({file_url})", unsafe_allow_html=True)
+        
+        # Also show the file path for users who want to navigate to it directly
+        st.info(f"Report location: {os.path.abspath(report_path)}")

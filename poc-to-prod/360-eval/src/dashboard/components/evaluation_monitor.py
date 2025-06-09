@@ -19,11 +19,20 @@ class EvaluationMonitorComponent:
         # Sync evaluation statuses from files
         sync_evaluations_from_files()
         
+        # Set up auto-refresh
+        if 'last_refresh_time' not in st.session_state:
+            st.session_state.last_refresh_time = time.time()
+            
+        # Check if 10 seconds have passed since last refresh
+        current_time = time.time()
+        if current_time - st.session_state.last_refresh_time > 10:
+            sync_evaluations_from_files()
+            st.session_state.last_refresh_time = current_time
+            dashboard_logger.info("Auto-refreshed evaluation statuses")
+            
         # Add a UI indicator for the log file location
         log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'logs')
         st.info(f"📋 Logs available at: {log_dir}")
-        
-        st.subheader("Active Evaluations")
         
         # Get current session time
         current_session_start = st.session_state.get('session_start_time', time.time())
@@ -31,16 +40,29 @@ class EvaluationMonitorComponent:
             st.session_state.session_start_time = current_session_start
             dashboard_logger.info(f"Set session start time to {current_session_start}")
         
-        # Check if there are any active evaluations
-        dashboard_logger.debug("Retrieving active evaluations")
-        active_evals = self._get_active_evaluations(current_session_start)
-        dashboard_logger.info(f"Found {len(active_evals)} active evaluations")
+        # Retrieve all evaluations for this session
+        dashboard_logger.debug("Retrieving session evaluations")
+        session_evals = self._get_session_evaluations(current_session_start)
         
-        if not active_evals:
+        # Separate active and recently completed evaluations
+        active_evals = [e for e in session_evals if e.get('status') in ['in-progress', 'running']]
+        completed_evals = [e for e in session_evals if e.get('status') == 'completed' and 
+                          e.get('end_time', 0) > current_time - 60]  # Show completed in last minute
+        failed_evals = [e for e in session_evals if e.get('status') == 'failed' and
+                       e.get('end_time', 0) > current_time - 60]  # Show failed in last minute
+        
+        # Display active and recent evaluations
+        st.subheader("Active & Recent Evaluations")
+        all_display_evals = active_evals + completed_evals + failed_evals
+        
+        if not all_display_evals:
             st.info("No active evaluations in this session. Go to Setup tab to create and run evaluations.")
         else:
-            # Display active evaluations with status indicators
-            for i, eval_config in enumerate(active_evals):
+            dashboard_logger.info(f"Displaying {len(all_display_evals)} evaluations (Active: {len(active_evals)}, " +
+                                  f"Recently Completed: {len(completed_evals)}, Failed: {len(failed_evals)})")
+            
+            # Display evaluations with status indicators
+            for i, eval_config in enumerate(all_display_evals):
                 with st.container():
                     col1, col2, col3 = st.columns([3, 2, 1])
                     
@@ -49,7 +71,7 @@ class EvaluationMonitorComponent:
                         
                         # Display status as colored indicator
                         status = eval_config.get('status', 'unknown')
-                        if status == "in-progress":
+                        if status in ['in-progress', 'running']:
                             st.markdown("🔄 **Status**: <span style='color:blue'>In Progress</span>", unsafe_allow_html=True)
                         elif status == "failed":
                             st.markdown("❌ **Status**: <span style='color:red'>Failed</span>", unsafe_allow_html=True)
@@ -70,6 +92,20 @@ class EvaluationMonitorComponent:
                             st.write(f"Elapsed: {self._format_time(elapsed)}")
                     
                     with col3:
+                        # Show report link for completed evaluations
+                        if status == "completed" and 'results' in eval_config and eval_config['results']:
+                            report_path = eval_config['results']
+                            # Check if file exists
+                            if os.path.exists(report_path):
+                                # Create report link
+                                report_filename = os.path.basename(report_path)
+                                # Convert to file:// URL for local file
+                                file_url = f"file://{os.path.abspath(report_path)}"
+                                st.markdown(f"[📊 Open Report]({file_url})", unsafe_allow_html=True)
+                                dashboard_logger.info(f"Provided link to report: {report_path}")
+                            else:
+                                st.error("Report file not found")
+                        
                         # Add view logs button
                         if 'logs_dir' in eval_config and os.path.exists(eval_config['logs_dir']):
                             if st.button("View Logs", key=f"logs_{i}"):
@@ -81,13 +117,6 @@ class EvaluationMonitorComponent:
                             dashboard_logger.info(f"Showing debug info for evaluation {eval_config['id']}")
                             with st.expander("Evaluation Details"):
                                 st.json({k: str(v) if k == 'csv_data' else v for k, v in eval_config.items()})
-                        
-                        # Allow cancellation (not implemented in this version)
-                        st.button(
-                            "Cancel",
-                            key=f"cancel_{i}",
-                            help="Cancel this evaluation (not implemented in this version)"
-                        )
                 
                 # Show error if present
                 if 'error' in eval_config and eval_config['error']:
@@ -98,8 +127,36 @@ class EvaluationMonitorComponent:
                 st.divider()
             
             # Add refresh button for active evaluations
-            if st.button("Refresh Status", on_click=sync_evaluations_from_files):
-                dashboard_logger.info("Manually refreshed evaluation statuses")
+            col1, col2 = st.columns([1, 5])
+            with col1:
+                if st.button("Refresh Now", on_click=sync_evaluations_from_files):
+                    dashboard_logger.info("Manually refreshed evaluation statuses")
+            with col2:
+                st.caption("Status auto-refreshes every 10 seconds")
+    
+    def _get_session_evaluations(self, session_start_time):
+        """Get all evaluations for the current session, including completed ones."""
+        session_evals = []
+        
+        # Get from session state
+        if hasattr(st.session_state, 'evaluations'):
+            for eval_config in st.session_state.evaluations:
+                # Check if this evaluation was started in this session
+                status_file = Path(eval_config.get("output_dir", "benchmark_results")) / f"eval_{eval_config['id']}_status.json"
+                if status_file.exists():
+                    try:
+                        with open(status_file, 'r') as f:
+                            status_data = json.load(f)
+                            # Include if started in this session
+                            if status_data.get('start_time', 0) >= session_start_time:
+                                # Merge status data with eval config
+                                eval_data = eval_config.copy()
+                                eval_data.update(status_data)
+                                session_evals.append(eval_data)
+                    except:
+                        pass
+                        
+        return session_evals
         
         st.subheader("Available Evaluations")
         
@@ -145,35 +202,19 @@ class EvaluationMonitorComponent:
                     args=(selected_eval_ids,)
                 )
     
-    def _get_active_evaluations(self, session_start_time):
-        """Get evaluations that are active in the current session."""
-        active_evals = []
+    def _show_report(self, report_path):
+        """Display an HTML report."""
+        # Check if report exists
+        if not os.path.exists(report_path):
+            st.error(f"Report file not found: {report_path}")
+            return
         
-        # First get from session state
-        if hasattr(st.session_state, 'evaluations'):
-            for eval_config in st.session_state.evaluations:
-                # Check if this evaluation was started in this session
-                status_file = Path(eval_config.get("output_dir", "benchmark_results")) / f"eval_{eval_config['id']}_status.json"
-                if status_file.exists():
-                    try:
-                        with open(status_file, 'r') as f:
-                            status_data = json.load(f)
-                            # Include if started in this session or still in-progress
-                            if (status_data.get('start_time', 0) >= session_start_time or 
-                                status_data.get('status') == 'in-progress'):
-                                
-                                # Merge status data with eval config
-                                eval_data = eval_config.copy()
-                                eval_data.update(status_data)
-                                active_evals.append(eval_data)
-                    except:
-                        pass
-                        
-                # Also include any that are marked as running in session state
-                elif eval_config.get('status') in ['running', 'in-progress']:
-                    active_evals.append(eval_config)
-                    
-        return active_evals
+        # Read HTML content
+        with open(report_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        # Display HTML
+        st.components.v1.html(html_content, height=600, scrolling=True)
     
     def _format_time(self, seconds):
         """Format seconds into a readable time string."""
