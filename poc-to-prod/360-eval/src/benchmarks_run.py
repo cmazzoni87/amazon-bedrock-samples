@@ -408,24 +408,31 @@ def main(
     if defined_metrics:
         user_defined_metrics = [metrics.strip().replace(' ', '-') for metrics in defined_metrics.split(',')]
 
-    # Create logs directory
-    logs_dir = "logs"
-    dir_path = os.path.join(os.path.dirname(__file__), logs_dir)
-    os.makedirs(dir_path, exist_ok=True)
+    # Get project root directory
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    
+    # Create logs directory with absolute path
+    logs_dir = os.path.join(project_root, "logs")
+    os.makedirs(logs_dir, exist_ok=True)
     
     # Setup logging
-    ts, log_file = setup_logging(dir_path)
+    ts, log_file = setup_logging(logs_dir)
     logging.info(f"Starting benchmark run: {experiment_name}")
     print(f"Logs are being saved to: {log_file}")
     
-    # Create output directory
+    # Ensure output directory is absolute
+    if not os.path.isabs(output_dir):
+        output_dir = os.path.join(project_root, output_dir)
     os.makedirs(output_dir, exist_ok=True)
     
     # Create directory for unprocessed records
     unprocessed_dir = os.path.join(output_dir, "unprocessed")
     os.makedirs(unprocessed_dir, exist_ok=True)
 
-    eval_dir = "./prompt-evaluations"
+    # Use consistent paths for prompt evaluations directory
+    eval_dir = os.path.join(project_root, "prompt-evaluations")
+    os.makedirs(eval_dir, exist_ok=True)
+    
     file_path = os.path.join(eval_dir, input_file)
     judges_list = []
     judge_file_name = "judge_profiles.jsonl"
@@ -533,7 +540,7 @@ def main(
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Advanced Unified LLM Benchmarking Tool")
     p.add_argument("input_file",                  help="JSONL file with scenarios")
-    p.add_argument("--output_dir",                default="./benchmark_results")
+    p.add_argument("--output_dir",                default="benchmark_results")
     p.add_argument("--parallel_calls",            type=int, default=4)
     p.add_argument("--invocations_per_scenario",  type=int, default=2)
     p.add_argument("--sleep_between_invocations", type=int, default=3)

@@ -46,12 +46,21 @@ def convert_to_jsonl(df, prompt_col, golden_answer_col, task_type, task_criteria
     Returns:
         Path to the created JSONL file
     """
-    if df is None or prompt_col not in df.columns or golden_answer_col not in df.columns:
-        st.error("Invalid CSV data or column names")
+    if df is None:
+        st.error("Invalid CSV data")
+        return None
+    
+    if prompt_col is None or golden_answer_col is None:
+        st.error("Please select both prompt and golden answer columns")
+        return None
+        
+    if prompt_col not in df.columns or golden_answer_col not in df.columns:
+        st.error(f"Selected columns not found in CSV: {prompt_col}, {golden_answer_col}")
         return None
 
-    # Create output directory if it doesn't exist
-    prompt_eval_dir = Path(output_dir) / "prompt-evaluations"
+    # Use the absolute prompt-evaluations directory path from constants
+    from ..utils.constants import PROJECT_ROOT, DEFAULT_PROMPT_EVAL_DIR
+    prompt_eval_dir = Path(DEFAULT_PROMPT_EVAL_DIR)
     os.makedirs(prompt_eval_dir, exist_ok=True)
     
     # Generate JSONL file path
@@ -70,12 +79,13 @@ def convert_to_jsonl(df, prompt_col, golden_answer_col, task_type, task_criteria
             "golden_answer": row[golden_answer_col]
         }
         jsonl_data.append(entry)
-    print(jsonl_path)
+    
     # Write to JSONL file
     with open(jsonl_path, 'w', encoding='utf-8') as f:
         for entry in jsonl_data:
             f.write(json.dumps(entry) + '\n')
     
+    # Return both the absolute path and the filename for CLI compatibility
     return str(jsonl_path)
 
 
@@ -90,7 +100,9 @@ def create_model_profiles_jsonl(models, output_dir):
     Returns:
         Path to the created JSONL file
     """
-    prompt_eval_dir = Path(output_dir) / "prompt-evaluations"
+    # Use the absolute prompt-evaluations directory path from constants
+    from ..utils.constants import PROJECT_ROOT, DEFAULT_PROMPT_EVAL_DIR
+    prompt_eval_dir = Path(DEFAULT_PROMPT_EVAL_DIR)
     os.makedirs(prompt_eval_dir, exist_ok=True)
     
     jsonl_path = prompt_eval_dir / "model_profiles.jsonl"
@@ -120,7 +132,9 @@ def create_judge_profiles_jsonl(judges, output_dir):
     Returns:
         Path to the created JSONL file
     """
-    prompt_eval_dir = Path(output_dir) / "prompt-evaluations"
+    # Use the absolute prompt-evaluations directory path from constants
+    from ..utils.constants import PROJECT_ROOT, DEFAULT_PROMPT_EVAL_DIR
+    prompt_eval_dir = Path(DEFAULT_PROMPT_EVAL_DIR)
     os.makedirs(prompt_eval_dir, exist_ok=True)
     
     jsonl_path = prompt_eval_dir / "judge_profiles.jsonl"

@@ -1,12 +1,31 @@
 import json
+import os
+from pathlib import Path
 
-def generate_model_info(file_path='/Users/claumazz/Projects/amazon-bedrock-samples/poc-to-prod/360-eval/config/models_profiles.jsonl'):
+# Project root directory
+# Calculate project root - go up one level from the src directory
+PROJECT_ROOT = Path(os.path.abspath(__file__)).parents[3]
+
+# Default directories - using absolute paths
+DEFAULT_OUTPUT_DIR = str(PROJECT_ROOT / "benchmark_results")
+DEFAULT_PROMPT_EVAL_DIR = str(PROJECT_ROOT / "prompt-evaluations")
+CONFIG_DIR = str(PROJECT_ROOT / "config")
+
+def get_config_path(filename):
+    """Get absolute path to a config file"""
+    return os.path.join(CONFIG_DIR, filename)
+
+def generate_model_info(filename='models_profiles.jsonl'):
+    """
+    Load model information from config files using project-relative paths
+    """
+    file_path = get_config_path(filename)
     try:
         # Initialize empty structures
         bedrock_models = []
         openai_models = []
         cost_map = {}
-        print(file_path)
+        
         # Read and process the JSONL file
         with open(file_path, 'r') as file:
             for line in file:
@@ -33,25 +52,6 @@ def generate_model_info(file_path='/Users/claumazz/Projects/amazon-bedrock-sampl
                 except KeyError as e:
                     print(f"Warning: Missing key in data: {e} for line: {line}")
 
-        # Print the results in the requested format
-        print("DEFAULT_BEDROCK_MODELS = [")
-        for model in bedrock_models:
-            print(f"    \"{model}\",")
-        print("]")
-        print()
-
-        print("DEFAULT_OPENAI_MODELS = [")
-        for model in openai_models:
-            print(f"    \"{model}\",")
-        print("]")
-        print()
-
-        print("# Default token costs (per 1000 tokens)")
-        print("DEFAULT_COST_MAP = {")
-        for model, costs in cost_map.items():
-            print(f"    \"{model}\": {{\"input\": {costs['input']}, \"output\": {costs['output']}}},")
-        print("}")
-
         # Return the generated structures
         return {
             "DEFAULT_BEDROCK_MODELS": bedrock_models,
@@ -61,12 +61,10 @@ def generate_model_info(file_path='/Users/claumazz/Projects/amazon-bedrock-sampl
 
     except FileNotFoundError:
         print(f"Error: File '{file_path}' not found.")
-        return None
+        return {"DEFAULT_BEDROCK_MODELS": [], "DEFAULT_OPENAI_MODELS": [], "DEFAULT_COST_MAP": {}}
     except Exception as e:
         print(f"Error: {str(e)}")
-        return None
-
-
+        return {"DEFAULT_BEDROCK_MODELS": [], "DEFAULT_OPENAI_MODELS": [], "DEFAULT_COST_MAP": {}}
 
 """Constants for the Streamlit dashboard."""
 
@@ -84,11 +82,6 @@ This dashboard provides an intuitive interface for:
 
 For more details, see the [README.md](https://github.com/aws-samples/amazon-bedrock-samples/tree/360-eval/poc-to-prod/360-eval)
 """
-
-# Default directories
-DEFAULT_OUTPUT_DIR = "benchmark_results"
-DEFAULT_PROMPT_EVAL_DIR = "prompt-evaluations"
-CONFIG_DIR = "config"
 
 # Evaluation parameters
 DEFAULT_PARALLEL_CALLS = 4
@@ -155,45 +148,13 @@ AWS_REGIONS = [
     ]
 
 
-defaults = generate_model_info()
-
+# Load model data
+defaults = generate_model_info('models_profiles.jsonl')
 DEFAULT_BEDROCK_MODELS = defaults['DEFAULT_BEDROCK_MODELS']
 DEFAULT_OPENAI_MODELS = defaults['DEFAULT_OPENAI_MODELS']
 DEFAULT_COST_MAP = defaults['DEFAULT_COST_MAP']
 
-judges = generate_model_info("/Users/claumazz/Projects/amazon-bedrock-samples/poc-to-prod/360-eval/config/judge_profiles.jsonl")
-
+# Load judge data
+judges = generate_model_info('judge_profiles.jsonl')
 DEFAULT_JUDGES = judges['DEFAULT_BEDROCK_MODELS']
 DEFAULT_JUDGES_COST = judges['DEFAULT_COST_MAP']
-
-# # Default model list - can be extended
-# DEFAULT_BEDROCK_MODELS = [
-#     "amazon.nova-pro-v1:0",
-#     "amazon.nova-lite-v1:0",
-#     "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-#     "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-#     "us.meta.llama3-3-70b-instruct-v1:0",
-#     "meta.llama3-70b-instruct-v1:0",
-#     "mistral.mixtral-8x7b-instruct-v0:1",
-# ]
-#
-# DEFAULT_OPENAI_MODELS = [
-#     "openai/gpt-4.1",
-#     "openai/gpt-4.1-mini",
-#     "openai/gpt-4o",
-#     "openai/gpt-4o-mini",
-# ]
-#
-# # Default token costs (per 1000 tokens)
-# DEFAULT_COST_MAP = {
-#     "amazon.nova-pro-v1:0": {"input": 0.0008, "output": 0.0032},
-#     "amazon.nova-lite-v1:0": {"input": 0.00006, "output": 0.000015},
-#     "us.anthropic.claude-3-5-haiku-20241022-v1:0": {"input": 0.000001, "output": 0.000015},
-#     "us.anthropic.claude-3-5-sonnet-20241022-v2:0": {"input": 0.003, "output": 0.015},
-#     "us.meta.llama3-3-70b-instruct-v1:0": {"input": 0.00072, "output": 0.00072},
-#     "mistral.mixtral-8x7b-instruct-v0:1": {"input": 0.00045, "output": 0.0007},
-#     "openai/gpt-4.1": {"input": 0.002, "output": 0.012},
-#     "openai/gpt-4.1-mini": {"input": 0.0004, "output": 0.0016},
-#     "openai/gpt-4o": {"input": 0.005, "output": 0.02},
-#     "openai/gpt-4o-mini": {"input": 0.0006, "output": 0.0024},
-# }

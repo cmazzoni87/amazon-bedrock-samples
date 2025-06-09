@@ -86,8 +86,8 @@ class ModelConfigurationComponent:
         if not is_valid and missing_items:
             st.warning(f"Please complete the following before saving: {', '.join(missing_items)}")
         
-        # Action buttons
-        col1, col2, col3 = st.columns(3)
+        # Action buttons - only save and reset, no direct run
+        col1, col2 = st.columns(2)
         
         with col1:
             st.button(
@@ -100,13 +100,6 @@ class ModelConfigurationComponent:
             st.button(
                 "Reset Configuration",
                 on_click=self._reset_configuration
-            )
-        
-        with col3:
-            st.button(
-                "Run Evaluation",
-                on_click=self._run_evaluation,
-                disabled=not is_valid
             )
     
     def _render_model_dropdown(self, model_list, prefix, region):
@@ -289,8 +282,8 @@ class ModelConfigurationComponent:
         # Check for CSV data with prompt and golden answer columns
         if config["csv_data"] is None:
             missing_items.append("CSV data")
-        # elif not config["prompt_column"] or not config["golden_answer_column"]:
-        #     missing_items.append("prompt and golden answer column selection")
+        elif not config["prompt_column"] or not config["golden_answer_column"]:
+            missing_items.append("prompt and golden answer column selection")
         
         # Check for task type and criteria
         if not config["task_type"]:
