@@ -90,11 +90,15 @@ class ModelConfigurationComponent:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.button(
+            if st.button(
                 "Save Configuration",
-                on_click=save_current_evaluation,
                 disabled=not is_valid
-            )
+            ):
+                save_current_evaluation()
+                st.success(f"Configuration '{st.session_state.current_evaluation_config['name']}' saved successfully!")
+                # Debug information
+                print(f"Saved configuration to session state. Total evaluations: {len(st.session_state.evaluations)}")
+                print(f"Evaluation IDs: {[e['id'] for e in st.session_state.evaluations]}")
         
         with col2:
             st.button(

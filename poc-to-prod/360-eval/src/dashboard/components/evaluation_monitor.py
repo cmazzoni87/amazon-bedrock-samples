@@ -16,6 +16,11 @@ class EvaluationMonitorComponent:
         """Render the evaluation monitor component."""
         dashboard_logger.info("Rendering evaluation monitor component")
         
+        # Debug information about current session state
+        print(f"Current evaluations in session state: {len(st.session_state.evaluations)}")
+        for i, eval_config in enumerate(st.session_state.evaluations):
+            print(f"Evaluation {i+1}: ID={eval_config['id']}, Name={eval_config['name']}, Status={eval_config['status']}")
+        
         # Sync evaluation statuses from files
         sync_evaluations_from_files()
         
@@ -137,13 +142,15 @@ class EvaluationMonitorComponent:
         # Display Available Evaluations Section
         st.subheader("Available Evaluations")
         
-        # Get all evaluations that are not active or recently completed
-        available_evals = [
-            e for e in st.session_state.evaluations 
-            if e["status"] == "configuring" or (
-               e["status"] not in ["in-progress", "running"] and 
-               e["id"] not in [a.get("id") for a in all_display_evals])
-        ]
+        # Debug session state
+        print(f"Checking for available evaluations in {len(st.session_state.evaluations)} total evaluations")
+        
+        # Get all evaluations regardless of status (we'll filter in the UI if needed)
+        available_evals = list(st.session_state.evaluations)
+        
+        # Print available evaluations for debugging
+        for i, e in enumerate(available_evals):
+            print(f"Evaluation {i+1}: ID={e['id']}, Name={e['name']}, Status={e['status']}")
         
         if not available_evals:
             st.info("No available evaluations. Go to Setup tab to create new evaluations.")

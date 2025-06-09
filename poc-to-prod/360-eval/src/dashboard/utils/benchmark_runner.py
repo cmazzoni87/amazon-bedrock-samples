@@ -342,13 +342,16 @@ def sync_evaluations_from_files():
     Sync evaluation statuses from status files.
     Call this function periodically from the main thread.
     """
+    # Make sure session state is initialized
     if "evaluations" not in st.session_state:
         dashboard_logger.warning("No evaluations found in session state")
+        print("No evaluations found in session state")
         return
         
-    # Get all evaluations
+    # Get all evaluations and print for debugging
     evaluations = st.session_state.evaluations
     dashboard_logger.info(f"Syncing status for {len(evaluations)} evaluations")
+    print(f"Syncing status for {len(evaluations)} evaluations with IDs: {[e['id'] for e in evaluations]}")
     
     for eval_config in evaluations:
         eval_id = eval_config["id"]

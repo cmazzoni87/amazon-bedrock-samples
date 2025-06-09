@@ -32,6 +32,12 @@ from src.dashboard.utils.constants import APP_TITLE, SIDEBAR_INFO, PROJECT_ROOT
 # Initialize session state at module level to ensure it's available before component rendering
 if "evaluations" not in st.session_state:
     initialize_session_state()
+    
+# Debug session state
+print("Session state initialized at module level:")
+print(f"Evaluations: {len(st.session_state.evaluations)}")
+print(f"Active evaluations: {len(st.session_state.active_evaluations)}")
+print(f"Completed evaluations: {len(st.session_state.completed_evaluations)}")
 
 def main():
     """Main Streamlit dashboard application."""
