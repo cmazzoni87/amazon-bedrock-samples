@@ -133,6 +133,50 @@ class EvaluationMonitorComponent:
                     dashboard_logger.info("Manually refreshed evaluation statuses")
             with col2:
                 st.caption("Status auto-refreshes every 10 seconds")
+        
+        # Display Available Evaluations Section
+        st.subheader("Available Evaluations")
+        
+        # Get all evaluations that are not active or recently completed
+        available_evals = [
+            e for e in st.session_state.evaluations 
+            if e["status"] == "configuring" or (
+               e["status"] not in ["in-progress", "running"] and 
+               e["id"] not in [a.get("id") for a in all_display_evals])
+        ]
+        
+        if not available_evals:
+            st.info("No available evaluations. Go to Setup tab to create new evaluations.")
+        else:
+            dashboard_logger.info(f"Found {len(available_evals)} available evaluations")
+            # Create a table of available evaluations
+            eval_data = []
+            for eval_config in available_evals:
+                eval_data.append({
+                    "ID": eval_config["id"],
+                    "Name": eval_config["name"],
+                    "Task Type": eval_config["task_type"],
+                    "Models": len(eval_config["selected_models"]),
+                    "Status": eval_config["status"].capitalize(),
+                    "Created": pd.to_datetime(eval_config["created_at"]).strftime("%Y-%m-%d %H:%M") if eval_config.get("created_at") else "N/A"
+                })
+            
+            eval_df = pd.DataFrame(eval_data)
+            st.dataframe(eval_df)
+            
+            # Allow running selected evaluations
+            st.subheader("Run Selected Evaluations")
+            
+            # Multiselect for evaluation IDs
+            selected_eval_ids = st.multiselect(
+                "Select evaluations to run",
+                options=[e["id"] for e in available_evals],
+                format_func=lambda x: next((e["name"] for e in available_evals if e["id"] == x), x)
+            )
+            
+            if selected_eval_ids:
+                if st.button("Run Selected Evaluations"):
+                    self._run_selected_evaluations(selected_eval_ids)
     
     def _get_session_evaluations(self, session_start_time):
         """Get all evaluations for the current session, including completed ones."""
@@ -258,19 +302,42 @@ class EvaluationMonitorComponent:
     def _run_selected_evaluations(self, eval_ids):
         """Run the selected evaluations."""
         dashboard_logger.info(f"Running selected evaluations: {eval_ids}")
+        
+        # Track successful starts for UI feedback
+        started_evals = []
+        failed_evals = []
+        
+        # Process each selected evaluation
         for eval_id in eval_ids:
             for eval_config in st.session_state.evaluations:
                 if eval_config["id"] == eval_id:
                     try:
+                        # Make sure the evaluation configuration is valid
+                        if not eval_config.get("selected_models") or not eval_config.get("judge_models"):
+                            raise ValueError("Missing required configuration: models or judge models")
+                            
+                        # Run the benchmark
                         run_benchmark_async(eval_config)
-                        st.success(f"Evaluation '{eval_config['name']}' started.")
+                        started_evals.append(eval_config["name"])
                         dashboard_logger.info(f"Successfully started evaluation: {eval_config['name']} (ID: {eval_id})")
-                        
-                        # Show log file location to user
-                        log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'logs')
-                        st.info(f"Check logs in: {log_dir}")
                     except Exception as e:
-                        error_msg = f"Error starting evaluation: {str(e)}"
+                        error_msg = f"Error starting evaluation '{eval_config['name']}': {str(e)}"
                         dashboard_logger.exception(error_msg)
-                        st.error(error_msg)
+                        failed_evals.append((eval_config["name"], str(e)))
                     break
+        
+        # Show success/failure messages
+        if started_evals:
+            st.success(f"Started evaluations: {', '.join(started_evals)}")
+            
+            # Show log file location to user
+            log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'logs')
+            st.info(f"Check logs in: {log_dir}")
+            
+        if failed_evals:
+            for name, error in failed_evals:
+                st.error(f"Failed to start '{name}': {error}")
+                
+        # Force refresh of UI state
+        if started_evals:
+            sync_evaluations_from_files()
