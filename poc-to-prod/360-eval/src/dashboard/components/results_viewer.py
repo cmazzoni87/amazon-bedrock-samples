@@ -56,36 +56,8 @@ class ResultsViewerComponent:
             if selected_eval_id:
                 self._show_evaluation_results(selected_eval_id)
         
-        st.subheader("Generated Reports")
-        
-        # Find all HTML reports in the benchmark results directory
-        benchmark_dir = Path(st.session_state.current_evaluation_config["output_dir"])
-        html_reports = []
-        
-        if benchmark_dir.exists():
-            for report_file in benchmark_dir.glob("llm_benchmark_report_*.html"):
-                html_reports.append({
-                    "filename": report_file.name,
-                    "path": str(report_file),
-                    "created": pd.Timestamp(os.path.getmtime(report_file), unit='s').strftime("%Y-%m-%d %H:%M")
-                })
-        
-        if not html_reports:
-            st.info("No HTML reports found. Run evaluations to generate reports.")
-        else:
-            # Create a table of reports
-            reports_df = pd.DataFrame(html_reports)
-            st.dataframe(reports_df)
-            
-            # Select a report to view
-            selected_report = st.selectbox(
-                "Select report to view",
-                options=[r["path"] for r in html_reports],
-                format_func=lambda x: next((r["filename"] for r in html_reports if r["path"] == x), x)
-            )
-            
-            if selected_report:
-                self._show_report(selected_report)
+        # The Generated Reports section has been removed as reports are now linked in a different section
+        # after evaluation is executed.
     
     def _show_evaluation_results(self, eval_id):
         """Show detailed results for a specific evaluation."""

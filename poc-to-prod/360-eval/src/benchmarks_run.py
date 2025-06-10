@@ -423,15 +423,8 @@ def main(
     ts, log_file = setup_logging(logs_dir)
     logging.info(f"Starting benchmark run: {experiment_name}")
     print(f"Logs are being saved to: {log_file}")
-    
-    # Set environment variables for file names if provided
-    if model_file_name:
-        os.environ["MODEL_FILE_NAME"] = model_file_name
-        logging.info(f"Using custom model file name: {model_file_name}")
-    if judge_file_name:
-        os.environ["JUDGE_FILE_NAME"] = judge_file_name
-        logging.info(f"Using custom judge file name: {judge_file_name}")
-    
+
+
     # Ensure output directory is absolute
     if not os.path.isabs(output_dir):
         output_dir = os.path.join(project_root, output_dir)
@@ -447,8 +440,9 @@ def main(
     
     file_path = os.path.join(eval_dir, input_file)
     judges_list = []
-    judge_file_name = os.environ.get("JUDGE_FILE_NAME", "judge_profiles.jsonl")
-    model_file_name = os.environ.get("MODEL_FILE_NAME", "model_profiles.jsonl")
+
+    judge_file_name = judge_file_name if judge_file_name else "judge_profiles.jsonl"
+    model_file_name = model_file_name if model_file_name else "model_profiles.jsonl"
     judge_path = os.path.join(eval_dir, judge_file_name)
     model_path = os.path.join(eval_dir, model_file_name)
     with open(judge_path, 'r', encoding='utf-8') as f:
