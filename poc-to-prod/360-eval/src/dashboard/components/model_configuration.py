@@ -94,11 +94,17 @@ class ModelConfigurationComponent:
                 "Save Configuration",
                 disabled=not is_valid
             ):
+                # Save the configuration
                 save_current_evaluation()
                 st.success(f"Configuration '{st.session_state.current_evaluation_config['name']}' saved successfully!")
+                
                 # Debug information
                 print(f"Saved configuration to session state. Total evaluations: {len(st.session_state.evaluations)}")
                 print(f"Evaluation IDs: {[e['id'] for e in st.session_state.evaluations]}")
+                
+                # Reset input fields for better UX
+                self._clear_selected_models()
+                self._clear_judge_models()
         
         with col2:
             st.button(
@@ -239,44 +245,33 @@ class ModelConfigurationComponent:
             "output_cost": output_cost
         })
     
+    def _clear_models(self, model_type):
+        """Clear models of the specified type.
+        
+        Args:
+            model_type (str): Either "selected_models" or "judge_models"
+        """
+        if model_type in ["selected_models", "judge_models"]:
+            st.session_state.current_evaluation_config[model_type] = []
+    
     def _clear_selected_models(self):
         """Clear all selected models."""
-        st.session_state.current_evaluation_config["selected_models"] = []
+        self._clear_models("selected_models")
     
     def _clear_judge_models(self):
         """Clear all judge models."""
-        st.session_state.current_evaluation_config["judge_models"] = []
+        self._clear_models("judge_models")
     
     def _reset_configuration(self):
         """Reset the current configuration to default values."""
-        # Keep CSV data and column selections, reset everything else
-        csv_data = st.session_state.current_evaluation_config["csv_data"]
-        prompt_column = st.session_state.current_evaluation_config["prompt_column"]
-        golden_answer_column = st.session_state.current_evaluation_config["golden_answer_column"]
+        # Import here to avoid circular imports
+        from ..utils.state_management import reset_current_evaluation, reset_form_fields
         
-        st.session_state.current_evaluation_config = {
-            "id": None,
-            "name": f"Benchmark-{pd.Timestamp.now().strftime('%Y%m%d')}",
-            "csv_data": csv_data,
-            "prompt_column": prompt_column,
-            "golden_answer_column": golden_answer_column,
-            "task_type": "",
-            "task_criteria": "",
-            "output_dir": st.session_state.current_evaluation_config["output_dir"],
-            "parallel_calls": st.session_state.current_evaluation_config["parallel_calls"],
-            "invocations_per_scenario": st.session_state.current_evaluation_config["invocations_per_scenario"],
-            "sleep_between_invocations": st.session_state.current_evaluation_config["sleep_between_invocations"],
-            "experiment_counts": st.session_state.current_evaluation_config["experiment_counts"],
-            "temperature_variations": st.session_state.current_evaluation_config["temperature_variations"],
-            "selected_models": [],
-            "judge_models": [],
-            "user_defined_metrics": "",
-            "status": "configuring",
-            "progress": 0,
-            "created_at": None,
-            "updated_at": None,
-            "results": None
-        }
+        # Reset the configuration
+        reset_current_evaluation()
+        
+        # Also reset form fields
+        reset_form_fields()
     
     def _get_missing_configuration_items(self):
         """Get a list of missing configuration items."""

@@ -96,8 +96,14 @@ def save_current_evaluation():
         print(f"Added new evaluation with ID: {new_eval['id']}, Name: {new_eval['name']}")
         print(f"Session state after adding: {len(st.session_state.evaluations)} evaluations")
         
+        # Store the evaluation name before resetting for success message
+        eval_name = st.session_state.current_evaluation_config["name"]
+        
         # Reset current config for next evaluation
         reset_current_evaluation()
+        
+        # Also reset the form field values in session state to ensure clean UI
+        reset_form_fields()
     else:
         # This is an update to an existing evaluation
         eval_id = st.session_state.current_evaluation_config["id"]
@@ -118,14 +124,77 @@ def save_current_evaluation():
             new_eval = st.session_state.current_evaluation_config.copy() 
             new_eval["updated_at"] = datetime.now().isoformat()
             st.session_state.evaluations.append(new_eval)
-            
+        
+        # Store the evaluation name before resetting for success message  
+        eval_name = st.session_state.current_evaluation_config["name"]
+        
         # Reset current config for next evaluation
         reset_current_evaluation()
+        
+        # Also reset the form field values in session state to ensure clean UI
+        reset_form_fields()
+
+def reset_form_fields():
+    """Reset all form fields to ensure a clean state for the next configuration.
+    
+    This function is used to reset all UI form fields when creating a new configuration
+    or after saving an existing one.
+    """
+    # Reset file uploader
+    if 'csv_upload' in st.session_state:
+        st.session_state.csv_upload = None
+        
+    # Reset column selections
+    if 'prompt_column' in st.session_state:
+        st.session_state.prompt_column = None
+    if 'golden_answer_column' in st.session_state:
+        st.session_state.golden_answer_column = None
+        
+    # Reset text inputs
+    if 'task_type' in st.session_state:
+        st.session_state.task_type = ""
+    if 'task_criteria' in st.session_state:
+        st.session_state.task_criteria = ""
+    if 'user_defined_metrics' in st.session_state:
+        st.session_state.user_defined_metrics = ""
+        
+    # Reset model selection fields
+    if 'bedrock_model_select' in st.session_state:
+        # Keep the dropdown selection but clear the selected models list
+        pass
+    if 'openai_model_select' in st.session_state:
+        # Keep the dropdown selection but clear the selected models list
+        pass
+    if 'judge_model_select' in st.session_state:
+        # Keep the dropdown selection but clear the selected models list
+        pass
 
 
 def reset_current_evaluation():
     """Reset the current evaluation configuration to default values."""
     st.session_state.current_evaluation_config = create_new_evaluation()
+    
+    # Also clear the Streamlit input fields
+    if 'csv_upload' in st.session_state:
+        st.session_state.csv_upload = None
+    if 'prompt_column' in st.session_state:
+        st.session_state.prompt_column = None
+    if 'golden_answer_column' in st.session_state:
+        st.session_state.golden_answer_column = None
+    if 'task_type' in st.session_state:
+        st.session_state.task_type = ""
+    if 'task_criteria' in st.session_state:
+        st.session_state.task_criteria = ""
+    if 'user_defined_metrics' in st.session_state:
+        st.session_state.user_defined_metrics = ""
+    
+    # Reset model selection fields
+    if 'bedrock_model_select' in st.session_state:
+        st.session_state.bedrock_model_select = st.session_state.bedrock_model_select
+    if 'openai_model_select' in st.session_state:
+        st.session_state.openai_model_select = st.session_state.openai_model_select
+    if 'judge_model_select' in st.session_state:
+        st.session_state.judge_model_select = st.session_state.judge_model_select
 
 
 def load_evaluation(eval_id):
