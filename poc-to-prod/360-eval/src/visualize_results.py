@@ -110,6 +110,31 @@ def load_data(directory):
     # Calculate tokens per second
     df['OTPS'] = df['output_tokens'] / (df['time_to_last_byte'] + 0.001)
 
+    # ── Cost summary ───────────────────────────────────────────────────────────
+    cost_stats = (
+        df.groupby(["model_id", "inference_profile"])["response_cost"]
+          .agg(avg_cost="mean", total_cost="sum", num_invocations="count")
+    )
+
+    # ── Latency percentiles (50/90/95/99) ──────────────────────────────────────
+    latency_stats = (
+        df.groupby(["model_id", "inference_profile"])["time_to_last_byte"]
+          .quantile([0.50, 0.90, 0.95, 0.99])         # returns MultiIndex
+          .unstack(level=-1)                          # percentiles → columns
+    )
+    latency_stats.columns = [f"p{int(q*100)}" for q in latency_stats.columns]
+
+    # ── Combine both sets of metrics ──────────────────────────────────────────
+    summary = cost_stats.join(latency_stats)
+
+    # Optional: forecast spend per model/profile (30-day projection)
+    summary["monthly_forecast"] = (
+        summary["avg_cost"]
+        * (summary["num_invocations"] / df.shape[0])
+        * 30
+    )
+    df = pd.concat([df, summary], axis=1)
+
     return df
 
 

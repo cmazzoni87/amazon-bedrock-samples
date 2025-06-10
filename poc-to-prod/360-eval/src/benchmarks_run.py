@@ -3,6 +3,7 @@ import time
 import concurrent.futures
 import json
 import logging
+import numpy as np
 import pandas as pd
 import argparse
 from dotenv import load_dotenv
@@ -396,6 +397,7 @@ def execute_benchmark(_, scenarios, cfg, unprocessed_dir):
 def main(
     input_file,
     output_dir,
+    report,
     parallel_calls,
     invocations_per_scenario,
     sleep_between_invocations,
@@ -499,48 +501,24 @@ def main(
         logging.info(f"Run {run} results saved to {out_csv}")
         all_dfs.append(df)
 
-    master = pd.concat(all_dfs, ignore_index=True)
-
-    # # Latency percentiles
-    # lat = master["time_to_last_byte"].dropna()
-    # pct = {f"p{p}": np.percentile(lat,p) for p in (50, 90, 95, 99)}
-    # print("Latency percentiles:", pct)
-    # logging.info(f"Percentiles: {pct}")
-
-    # Cost summary & monthly forecast
-    cost_sum = (
-        master
-        .groupby(["model_id","inference_profile"])["response_cost"]
-        .agg(["mean","sum","count"])
-        .rename(columns={"mean":"avg_cost","sum":"total_cost","count":"num_invocations"})
-    )
-    cost_sum["monthly_forecast"] = (
-        cost_sum["avg_cost"] *
-        (cost_sum["num_invocations"] / invocations_per_scenario) * 30
-    )
-    print("\nCost summary & forecast:\n", cost_sum)
-
-    logging.info(f"Cost summary:\n{cost_sum}")
-
-    # Generate report
-    report = create_html_report(output_dir, ts)
-    
     # Check for unprocessed records
     unprocessed_files = [f for f in os.listdir(unprocessed_dir) if f.startswith("unprocessed_")]
     if unprocessed_files:
         logging.warning(f"Found {len(unprocessed_files)} files with unprocessed records in {unprocessed_dir}")
         print(f"\nWarning: {len(unprocessed_files)} files with unprocessed records found in {unprocessed_dir}")
-    
-    print(f"\nBenchmark complete! Report: {report}")
-    logging.info(f"Benchmark run complete. Report generated at {report}")
 
-
+    if report:
+        # Generate report
+        report = create_html_report(output_dir, ts)
+        print(f"\nBenchmark complete! Report: {report}")
+        logging.info(f"Benchmark run complete. Report generated at {report}")
 
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Advanced Unified LLM Benchmarking Tool")
     p.add_argument("input_file",                  help="JSONL file with scenarios")
     p.add_argument("--output_dir",                default="benchmark_results")
+    p.add_argument("--report",                    default=True)
     p.add_argument("--parallel_calls",            type=int, default=4)
     p.add_argument("--invocations_per_scenario",  type=int, default=2)
     p.add_argument("--sleep_between_invocations", type=int, default=3)
@@ -553,6 +531,7 @@ if __name__ == "__main__":
     main(
         args.input_file,
         args.output_dir,
+        args.report,
         args.parallel_calls,
         args.invocations_per_scenario,
         args.sleep_between_invocations,

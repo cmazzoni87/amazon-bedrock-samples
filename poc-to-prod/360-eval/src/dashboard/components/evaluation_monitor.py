@@ -38,6 +38,8 @@ class EvaluationMonitorComponent:
             st.session_state.last_status_check = {}
         if 'show_notification_sound' not in st.session_state:
             st.session_state.show_notification_sound = True
+        if 'pending_rerun' not in st.session_state:
+            st.session_state.pending_rerun = False
             
         # Check for status changes and create notifications
         for eval_config in st.session_state.evaluations:
@@ -188,14 +190,16 @@ class EvaluationMonitorComponent:
                                 eval_id = history_data[selected_history]["ID"]
                                 st.session_state.highlight_eval_id = eval_id
                                 dashboard_logger.info(f"Navigating to evaluation {eval_id} from history")
-                                st.rerun()
+                                # Use session state flag instead of direct rerun
+                                st.session_state.pending_rerun = True
                         
                         with col2:
                             # Clear history button
                             if st.button("Clear History"):
                                 st.session_state.notification_history = []
                                 dashboard_logger.info("Cleared notification history")
-                                st.rerun()
+                                # Use session state flag instead of direct rerun
+                                st.session_state.pending_rerun = True
             
         # Use Streamlit's built-in auto-refresh functionality
         # This creates a small container with a "Refreshing..." spinner
@@ -206,9 +210,10 @@ class EvaluationMonitorComponent:
                 auto_refresh = st.empty()
                 with auto_refresh.container():
                     st.write("⟳ Auto-refreshing...")
-                    # Use Streamlit's built-in rerun mechanism
+                    # Use a safer approach to trigger rerun
                     time.sleep(5)  # Wait 5 seconds before refreshing
-                    st.rerun()  # This will rerun the entire app
+                    # Set a flag to trigger rerun at the end of rendering
+                    st.session_state.pending_rerun = True
                     
         # Track and display last refresh time
         current_time = time.time()
@@ -270,10 +275,24 @@ class EvaluationMonitorComponent:
                     col1, col2, col3 = st.columns([3, 2, 1])
                     
                     with col1:
-                        st.write(f"**{eval_config['name']}**")
-                        
                         # Display status as colored indicator
                         status = eval_config.get('status', 'unknown')
+                        
+                        # Check if this evaluation has a report to link to
+                        has_report = (status == "completed" and 
+                                     'results' in eval_config and 
+                                     eval_config['results'] and 
+                                     os.path.exists(eval_config['results']))
+                        
+                        # Display name - as link if report exists
+                        if has_report:
+                            report_path = eval_config['results']
+                            file_url = f"file://{os.path.abspath(report_path)}"
+                            st.markdown(f"**[{eval_config['name']}]({file_url})**", unsafe_allow_html=True)
+                        else:
+                            st.write(f"**{eval_config['name']}**")
+                        
+                        # Display status indicator
                         if status in ['in-progress', 'running']:
                             st.markdown("🔄 **Status**: <span style='color:blue'>In Progress</span>", unsafe_allow_html=True)
                         elif status == "failed":
@@ -295,19 +314,18 @@ class EvaluationMonitorComponent:
                             st.write(f"Elapsed: {self._format_time(elapsed)}")
                     
                     with col3:
-                        # Show report link for completed evaluations
-                        if status == "completed" and 'results' in eval_config and eval_config['results']:
-                            report_path = eval_config['results']
-                            # Check if file exists
-                            if os.path.exists(report_path):
-                                # Create report link
-                                report_filename = os.path.basename(report_path)
-                                # Convert to file:// URL for local file
-                                file_url = f"file://{os.path.abspath(report_path)}"
-                                st.markdown(f"[📊 Open Report]({file_url})", unsafe_allow_html=True)
-                                dashboard_logger.info(f"Provided link to report: {report_path}")
+                        # For completed evaluations, offer report options
+                        if status == "completed":
+                            # Check if a report already exists
+                            if 'results' in eval_config and eval_config['results'] and os.path.exists(eval_config['results']):
+                                # Log that we have a report
+                                dashboard_logger.info(f"Evaluation has report: {eval_config['results']}")
+                                st.markdown("📊 **Report Available**", unsafe_allow_html=True)
                             else:
-                                st.error("Report file not found")
+                                # Offer to generate a report
+                                if st.button(f"📊 Generate Report", key=f"gen_report_{i}"):
+                                    self._generate_report(eval_config)
+                                    dashboard_logger.info(f"Generating report for evaluation {eval_config['id']}")
                         
                         # Add view logs button
                         if 'logs_dir' in eval_config and os.path.exists(eval_config['logs_dir']):
@@ -336,8 +354,10 @@ class EvaluationMonitorComponent:
             # Add refresh button for active evaluations
             col1, col2 = st.columns([1, 5])
             with col1:
-                if st.button("Refresh Now", on_click=sync_evaluations_from_files):
+                if st.button("Refresh Now"):
+                    sync_evaluations_from_files()
                     dashboard_logger.info("Manually refreshed evaluation statuses")
+                    st.session_state.pending_rerun = True
             with col2:
                 st.caption("Status auto-refreshes every 10 seconds")
         
@@ -360,18 +380,86 @@ class EvaluationMonitorComponent:
             dashboard_logger.info(f"Found {len(available_evals)} available evaluations")
             # Create a table of available evaluations
             eval_data = []
+            
+            # First create a list of reports that are available
+            report_links = {}
+            completed_evals_without_reports = []
             for eval_config in available_evals:
+                # Check if this evaluation has a report
+                if (eval_config.get("status") == "completed" and 
+                    'results' in eval_config and 
+                    eval_config['results'] and 
+                    os.path.exists(eval_config['results'])):
+                    report_links[eval_config["id"]] = f"file://{os.path.abspath(eval_config['results'])}"
+                elif eval_config.get("status") == "completed":
+                    # Keep track of completed evaluations without reports
+                    completed_evals_without_reports.append(eval_config["id"])
+            
+            # Then create the table data
+            for eval_config in available_evals:
+                # Prepare the name field - as a link if report exists
+                if eval_config["id"] in report_links:
+                    name_field = f"<a href='{report_links[eval_config['id']]}'>{eval_config['name']}</a>"
+                else:
+                    name_field = eval_config["name"]
+                
+                # Determine what to display in the Report column
+                if eval_config["id"] in report_links:
+                    report_field = "📊 Available"
+                elif eval_config["id"] in completed_evals_without_reports:
+                    report_field = "🔄 Generate"
+                else:
+                    report_field = ""
+                    
                 eval_data.append({
                     "ID": eval_config["id"],
-                    "Name": eval_config["name"],
+                    "Name": name_field,
                     "Task Type": eval_config["task_type"],
                     "Models": len(eval_config["selected_models"]),
                     "Status": eval_config["status"].capitalize(),
-                    "Created": pd.to_datetime(eval_config["created_at"]).strftime("%Y-%m-%d %H:%M") if eval_config.get("created_at") else "N/A"
+                    "Created": pd.to_datetime(eval_config["created_at"]).strftime("%Y-%m-%d %H:%M") if eval_config.get("created_at") else "N/A",
+                    "Report": report_field
                 })
             
+            # Display the table
             eval_df = pd.DataFrame(eval_data)
-            st.dataframe(eval_df)
+            
+            # Show the dataframe with clickable elements
+            clicked = st.dataframe(
+                eval_df, 
+                use_container_width=True, 
+                column_config={
+                    "Name": st.column_config.Column("Name", width="medium", help="Click name to open report if available"),
+                    "Report": st.column_config.Column("Report", width="small", help="Click to generate report for completed evaluations")
+                },
+                hide_index=True
+            )
+            
+            # Add ability to generate reports for completed evaluations without reports
+            if completed_evals_without_reports:
+                st.caption("Click '🔄 Generate' in the Report column to generate reports for completed evaluations")
+                
+                selected_eval_id = st.selectbox(
+                    "Select evaluation to generate report for",
+                    options=completed_evals_without_reports,
+                    format_func=lambda x: next((e["name"] for e in available_evals if e["id"] == x), x)
+                )
+                
+                if st.button("Generate Report", key="gen_report_available"):
+                    # Find the selected evaluation config
+                    selected_eval = next((e for e in available_evals if e["id"] == selected_eval_id), None)
+                    if selected_eval:
+                        self._generate_report(selected_eval)
+                    else:
+                        st.error("Selected evaluation not found")
+            
+        # Handle any pending rerun at the end of the render method, outside of any containers
+        # This avoids the RerunData error
+        if st.session_state.pending_rerun:
+            # Reset the flag
+            st.session_state.pending_rerun = False
+            # Use rerun here safely at the top level
+            st.rerun()
             
             # Allow running selected evaluations
             st.subheader("Run Selected Evaluations")
@@ -508,6 +596,57 @@ class EvaluationMonitorComponent:
                 else:
                     st.info("No errors reported.")
     
+    def _generate_report(self, eval_config):
+        """Generate a report for a completed evaluation."""
+        try:
+            # Import the visualize_results module
+            from ...visualize_results import create_html_report
+            from ..utils.constants import PROJECT_ROOT
+            
+            # Get the output directory from the evaluation config
+            output_dir = eval_config.get("output_dir", "benchmark_results")
+            if not os.path.isabs(output_dir):
+                output_dir = os.path.join(PROJECT_ROOT, output_dir)
+            
+            # Generate timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # Create status indicator
+            with st.spinner("Generating report... This may take a moment."):
+                # Call the report generator
+                report_path = create_html_report(output_dir, timestamp)
+                
+                # Update the evaluation config with the report path
+                for i, e in enumerate(st.session_state.evaluations):
+                    if e["id"] == eval_config["id"]:
+                        st.session_state.evaluations[i]["results"] = str(report_path)
+                        # Update status file
+                        status_file = Path(output_dir) / f"eval_{eval_config['id']}_status.json"
+                        if status_file.exists():
+                            try:
+                                with open(status_file, 'r') as f:
+                                    status_data = json.load(f)
+                                status_data["results"] = str(report_path)
+                                with open(status_file, 'w') as f:
+                                    json.dump(status_data, f)
+                            except Exception as e:
+                                dashboard_logger.error(f"Error updating status file: {str(e)}")
+                        break
+                
+                # Show success message
+                st.success(f"Report generated: {os.path.basename(str(report_path))}")
+                
+                # Display link to open the report
+                file_url = f"file://{os.path.abspath(str(report_path))}"
+                st.markdown(f"[📊 Open Report]({file_url})", unsafe_allow_html=True)
+                
+                # Set pending rerun to refresh UI
+                st.session_state.pending_rerun = True
+                
+        except Exception as e:
+            st.error(f"Error generating report: {str(e)}")
+            dashboard_logger.exception(f"Error generating report: {str(e)}")
+
     def _run_selected_evaluations(self, eval_ids):
         """Run the selected evaluations."""
         dashboard_logger.info(f"Running selected evaluations: {eval_ids}")
