@@ -453,15 +453,7 @@ class EvaluationMonitorComponent:
                     else:
                         st.error("Selected evaluation not found")
             
-        # Handle any pending rerun at the end of the render method, outside of any containers
-        # This avoids the RerunData error
-        if st.session_state.pending_rerun:
-            # Reset the flag
-            st.session_state.pending_rerun = False
-            # Use rerun here safely at the top level
-            st.rerun()
-            
-            # Allow running selected evaluations
+            # Add section to run selected evaluations
             st.subheader("Run Selected Evaluations")
             
             # Multiselect for evaluation IDs
@@ -472,8 +464,16 @@ class EvaluationMonitorComponent:
             )
             
             if selected_eval_ids:
-                if st.button("Run Selected Evaluations"):
+                if st.button("Run Selected Evaluations", key="run_selected_btn"):
                     self._run_selected_evaluations(selected_eval_ids)
+            
+        # Handle any pending rerun at the end of the render method, outside of any containers
+        # This avoids the RerunData error
+        if st.session_state.pending_rerun:
+            # Reset the flag
+            st.session_state.pending_rerun = False
+            # Use rerun here safely at the top level
+            st.rerun()
     
     def _get_session_evaluations(self, session_start_time):
         """Get all evaluations for the current session, including completed ones."""
@@ -499,49 +499,13 @@ class EvaluationMonitorComponent:
                         
         return session_evals
         
-        st.subheader("Available Evaluations")
+        # This code is no longer used - the available evaluations section was rewritten
+        # and moved earlier in the render method
+        pass
         
-        # Get all evaluations that are not active and not completed
-        available_evals = [
-            e for e in st.session_state.evaluations 
-            if e["id"] not in [a["id"] for a in active_evals]
-            and e["status"] not in ["in-progress", "running", "completed"]
-        ]
-        
-        if not available_evals:
-            st.info("No available evaluations. Go to Setup tab to create new evaluations.")
-        else:
-            # Create a table of available evaluations
-            eval_data = []
-            for eval_config in available_evals:
-                eval_data.append({
-                    "ID": eval_config["id"],
-                    "Name": eval_config["name"],
-                    "Task Type": eval_config["task_type"],
-                    "Models": len(eval_config["selected_models"]),
-                    "Status": eval_config["status"].capitalize(),
-                    "Created": pd.to_datetime(eval_config["created_at"]).strftime("%Y-%m-%d %H:%M")
-                })
-            
-            eval_df = pd.DataFrame(eval_data)
-            st.dataframe(eval_df)
-            
-            # Allow running selected evaluations
-            st.subheader("Run Selected Evaluations")
-            
-            # Multiselect for evaluation IDs
-            selected_eval_ids = st.multiselect(
-                "Select evaluations to run",
-                options=[e["id"] for e in available_evals],
-                format_func=lambda x: next((e["name"] for e in available_evals if e["id"] == x), x)
-            )
-            
-            if selected_eval_ids:
-                st.button(
-                    "Run Selected Evaluations",
-                    on_click=self._run_selected_evaluations,
-                    args=(selected_eval_ids,)
-                )
+        # This code is no longer used - the available evaluations section was rewritten
+        # and moved earlier in the render method
+        pass
     
     def _show_report(self, report_path):
         """Display an HTML report."""
