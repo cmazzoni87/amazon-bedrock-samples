@@ -346,8 +346,8 @@ def execute_benchmark(_, scenarios, cfg, unprocessed_dir):
                     scn["inference_profile"],
                     scn["configured_output_tokens_for_request"],
                     scn["model_id"],
-                    scn["input_token_cost"] / 1000,
-                    scn["output_token_cost"] / 1000,
+                    scn["input_token_cost"],
+                    scn["output_token_cost"],
                     scn["TEMPERATURE"],
                     cfg["TOP_P"],
                     cfg["judge_models"],
@@ -404,7 +404,9 @@ def main(
     temp_variants,
     experiment_counts,
     experiment_name,
-    defined_metrics
+    defined_metrics,
+    model_file_name=None,
+    judge_file_name=None
 ):
     user_defined_metrics = None
     if defined_metrics:
@@ -422,6 +424,14 @@ def main(
     logging.info(f"Starting benchmark run: {experiment_name}")
     print(f"Logs are being saved to: {log_file}")
     
+    # Set environment variables for file names if provided
+    if model_file_name:
+        os.environ["MODEL_FILE_NAME"] = model_file_name
+        logging.info(f"Using custom model file name: {model_file_name}")
+    if judge_file_name:
+        os.environ["JUDGE_FILE_NAME"] = judge_file_name
+        logging.info(f"Using custom judge file name: {judge_file_name}")
+    
     # Ensure output directory is absolute
     if not os.path.isabs(output_dir):
         output_dir = os.path.join(project_root, output_dir)
@@ -437,8 +447,8 @@ def main(
     
     file_path = os.path.join(eval_dir, input_file)
     judges_list = []
-    judge_file_name = "judge_profiles.jsonl"
-    model_file_name = "model_profiles.jsonl"
+    judge_file_name = os.environ.get("JUDGE_FILE_NAME", "judge_profiles.jsonl")
+    model_file_name = os.environ.get("MODEL_FILE_NAME", "model_profiles.jsonl")
     judge_path = os.path.join(eval_dir, judge_file_name)
     model_path = os.path.join(eval_dir, model_file_name)
     with open(judge_path, 'r', encoding='utf-8') as f:
@@ -518,7 +528,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Advanced Unified LLM Benchmarking Tool")
     p.add_argument("input_file",                  help="JSONL file with scenarios")
     p.add_argument("--output_dir",                default="benchmark_results")
-    p.add_argument("--report",                    default=True)
+    p.add_argument("--report",                    type=lambda x: x.lower() == 'true', default=True)
     p.add_argument("--parallel_calls",            type=int, default=4)
     p.add_argument("--invocations_per_scenario",  type=int, default=2)
     p.add_argument("--sleep_between_invocations", type=int, default=3)
@@ -526,6 +536,8 @@ if __name__ == "__main__":
     p.add_argument("--experiment_name",           default=f"Benchmark-{datetime.now().strftime('%Y%m%d')}")
     p.add_argument("--temperature_variations",    type=int, default=0)
     p.add_argument("--user_defined_metrics",      default=None)
+    p.add_argument("--model_file_name",           default=None)
+    p.add_argument("--judge_file_name",           default=None)
     args = p.parse_args()
 
     main(
@@ -538,6 +550,8 @@ if __name__ == "__main__":
         args.temperature_variations,
         args.experiment_counts,
         args.experiment_name,
-        args.user_defined_metrics
+        args.user_defined_metrics,
+        args.model_file_name,
+        args.judge_file_name
     )
 

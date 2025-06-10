@@ -89,7 +89,7 @@ def convert_to_jsonl(df, prompt_col, golden_answer_col, task_type, task_criteria
     return str(jsonl_path)
 
 
-def create_model_profiles_jsonl(models, output_dir):
+def create_model_profiles_jsonl(models, output_dir, custom_filename=None):
     """
     Create a JSONL file with model profiles.
     
@@ -105,7 +105,7 @@ def create_model_profiles_jsonl(models, output_dir):
     prompt_eval_dir = Path(DEFAULT_PROMPT_EVAL_DIR)
     os.makedirs(prompt_eval_dir, exist_ok=True)
     
-    jsonl_path = prompt_eval_dir / "model_profiles.jsonl"
+    jsonl_path = prompt_eval_dir / (custom_filename or "model_profiles.jsonl")
     
     with open(jsonl_path, 'w', encoding='utf-8') as f:
         for model in models:
@@ -121,7 +121,7 @@ def create_model_profiles_jsonl(models, output_dir):
     return str(jsonl_path)
 
 
-def create_judge_profiles_jsonl(judges, output_dir):
+def create_judge_profiles_jsonl(judges, output_dir, custom_filename=None):
     """
     Create a JSONL file with judge model profiles.
     
@@ -137,7 +137,7 @@ def create_judge_profiles_jsonl(judges, output_dir):
     prompt_eval_dir = Path(DEFAULT_PROMPT_EVAL_DIR)
     os.makedirs(prompt_eval_dir, exist_ok=True)
     
-    jsonl_path = prompt_eval_dir / "judge_profiles.jsonl"
+    jsonl_path = prompt_eval_dir / (custom_filename or "judge_profiles.jsonl")
     
     with open(jsonl_path, 'w', encoding='utf-8') as f:
         for judge in judges:

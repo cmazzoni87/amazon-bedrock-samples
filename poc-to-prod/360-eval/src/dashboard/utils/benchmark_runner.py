@@ -132,12 +132,17 @@ def run_benchmark_process(eval_id):
             _update_status_file(status_file, "failed", 0, error=f"CSV conversion error: {str(e)}")
             return
         
-        # Create model profiles JSONL
+        # Create unique model profiles JSONL for this evaluation
         dashboard_logger.info(f"Creating model profiles JSONL for evaluation {eval_id}")
         try:
+            # Generate unique filenames for this evaluation
+            model_file_name = f"model_profiles_{eval_id}.jsonl"
+            judge_file_name = f"judge_profiles_{eval_id}.jsonl"
+            
             models_jsonl = create_model_profiles_jsonl(
                 evaluation_config["selected_models"],
-                ""
+                "",
+                custom_filename=model_file_name
             )
             dashboard_logger.info(f"Successfully created model profiles at {models_jsonl}")
         except Exception as e:
@@ -145,12 +150,13 @@ def run_benchmark_process(eval_id):
             _update_status_file(status_file, "failed", 0, error=f"Model profiles error: {str(e)}")
             return
         
-        # Create judge profiles JSONL
+        # Create unique judge profiles JSONL
         dashboard_logger.info(f"Creating judge profiles JSONL for evaluation {eval_id}")
         try:
             judges_jsonl = create_judge_profiles_jsonl(
                 evaluation_config["judge_models"],
-                ""
+                "",
+                custom_filename=judge_file_name
             )
             dashboard_logger.info(f"Successfully created judge profiles at {judges_jsonl}")
         except Exception as e:
@@ -173,12 +179,15 @@ def run_benchmark_process(eval_id):
             os.path.join(script_dir, "benchmarks_run.py"),
             jsonl_filename,
             "--output_dir", str(output_dir),
+            "--report", "False",
             "--parallel_calls", str(evaluation_config["parallel_calls"]),
             "--invocations_per_scenario", str(evaluation_config["invocations_per_scenario"]),
             "--sleep_between_invocations", str(evaluation_config["sleep_between_invocations"]),
             "--experiment_counts", str(evaluation_config["experiment_counts"]),
             "--experiment_name", evaluation_config["name"],
-            "--temperature_variations", str(evaluation_config["temperature_variations"])
+            "--temperature_variations", str(evaluation_config["temperature_variations"]),
+            "--model_file_name", model_file_name,
+            "--judge_file_name", judge_file_name
         ]
         
         if evaluation_config["user_defined_metrics"]:

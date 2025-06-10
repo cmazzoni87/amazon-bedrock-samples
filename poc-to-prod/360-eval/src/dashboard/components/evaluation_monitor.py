@@ -201,19 +201,13 @@ class EvaluationMonitorComponent:
                                 # Use session state flag instead of direct rerun
                                 st.session_state.pending_rerun = True
             
-        # Use Streamlit's built-in auto-refresh functionality
-        # This creates a small container with a "Refreshing..." spinner
-        # that triggers a full page refresh on the interval
-        with st.empty():
-            # Only show if we have active evaluations
-            if any(e.get('status') in ['in-progress', 'running'] for e in st.session_state.evaluations):
-                auto_refresh = st.empty()
-                with auto_refresh.container():
-                    st.write("⟳ Auto-refreshing...")
-                    # Use a safer approach to trigger rerun
-                    time.sleep(5)  # Wait 5 seconds before refreshing
-                    # Set a flag to trigger rerun at the end of rendering
-                    st.session_state.pending_rerun = True
+        # Auto-refresh with a more reliable approach
+        # Only schedule a rerun at the top level and avoid nested containers
+        if any(e.get('status') in ['in-progress', 'running'] for e in st.session_state.evaluations):
+            st.write("⟳ Auto-refreshing active evaluations...")
+            # Set a flag to trigger rerun at the end of rendering
+            # This avoids the "RerunData(page_script_hash="HASH-CODE", is_fragment_scoped_rerun=True)" error
+            st.session_state.pending_rerun = True
                     
         # Track and display last refresh time
         current_time = time.time()
