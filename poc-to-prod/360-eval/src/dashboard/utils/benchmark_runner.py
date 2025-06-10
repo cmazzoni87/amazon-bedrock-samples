@@ -19,7 +19,8 @@ from .csv_processor import (
 )
 
 # Set up dashboard logger
-DASHBOARD_LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'logs')
+from .constants import PROJECT_ROOT
+DASHBOARD_LOG_DIR = os.path.join(PROJECT_ROOT, 'logs')
 os.makedirs(DASHBOARD_LOG_DIR, exist_ok=True)
 dashboard_log_file = os.path.join(DASHBOARD_LOG_DIR, f'dashboard_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
 
@@ -96,8 +97,9 @@ def run_benchmark_process(eval_id):
         output_dir = Path(DEFAULT_OUTPUT_DIR)
         os.makedirs(output_dir, exist_ok=True)
         
-        # Create logs directory for this evaluation
-        logs_dir = output_dir / "logs" / f"eval_{eval_id}"
+        # Create logs directory for this evaluation - use PROJECT_ROOT/logs
+        from .constants import PROJECT_ROOT
+        logs_dir = Path(PROJECT_ROOT) / "logs" / f"eval_{eval_id}"
         os.makedirs(logs_dir, exist_ok=True)
         
         # Create a status file to track progress

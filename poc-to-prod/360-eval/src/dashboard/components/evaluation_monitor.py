@@ -223,7 +223,8 @@ class EvaluationMonitorComponent:
         dashboard_logger.info(f"Refreshed evaluation statuses (time since last refresh: {time_since_refresh:.1f}s)")
             
         # Add a UI indicator for the log file location
-        log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'logs')
+        from ..utils.constants import PROJECT_ROOT
+        log_dir = os.path.join(PROJECT_ROOT, 'logs')
         st.info(f"📋 Logs available at: {log_dir}")
         
         # Get current session time
@@ -539,7 +540,8 @@ class EvaluationMonitorComponent:
             st.success(f"Started evaluations: {', '.join(started_evals)}")
             
             # Show log file location to user
-            log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'logs')
+            from ..utils.constants import PROJECT_ROOT
+            log_dir = os.path.join(PROJECT_ROOT, 'logs')
             st.info(f"Check logs in: {log_dir}")
             
         if failed_evals:
